@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 
 # --- Pengaturan Tampilan ---
-ctk.set_appearance_mode("Dark")  # Set default to Dark mode
+ctk.set_appearance_mode("System")  # Will be controlled by user toggle
 ctk.set_default_color_theme("blue")
 
 class PDFCompressorApp(ctk.CTk):
@@ -23,15 +23,14 @@ class PDFCompressorApp(ctk.CTk):
 
         # --- Konfigurasi Jendela Utama ---
         self.title("Maximum PDF Compressor v1.1")
-        self.geometry("650x650")  # Increased height to show all elements
-        self.resizable(True, True)  # Allow resizing for better user experience
-        self.minsize(600, 600)  # Set minimum size
+        self.geometry("600x550")  # Slightly larger for new features
+        self.resizable(False, False)
 
         # --- Variabel ---
         self.input_file_paths = []
         self.output_folder_path = ctk.StringVar()
         self.ghostscript_path = self.get_ghostscript_path()
-        self.current_theme = ctk.StringVar(value=self.settings.get("theme", "Dark"))
+        self.current_theme = ctk.StringVar(value=self.settings.get("theme", "System"))
 
         # --- File Size Tracking ---
         self.original_sizes = {}
@@ -73,9 +72,9 @@ class PDFCompressorApp(ctk.CTk):
                 with open(self.settings_file, 'r') as f:
                     self.settings = json.load(f)
             else:
-                self.settings = {"theme": "Dark"}
+                self.settings = {"theme": "System"}
         except:
-            self.settings = {"theme": "Dark"}
+            self.settings = {"theme": "System"}
 
     def save_settings(self):
         """Save user settings to JSON file"""
@@ -180,13 +179,11 @@ class PDFCompressorApp(ctk.CTk):
         theme_frame = ctk.CTkFrame(header_content)
         theme_frame.grid(row=0, column=1, sticky="e")
 
-        # Theme toggle button with icons
-        self.theme_button = ctk.CTkButton(theme_frame, text="🌙", width=40, height=30,
-                                        command=self.toggle_theme, font=ctk.CTkFont(size=16))
-        self.theme_button.grid(row=0, column=0, padx=10, pady=10)
-        
-        # Set initial theme icon
-        self.update_theme_icon()
+        ctk.CTkLabel(theme_frame, text="Theme:").grid(row=0, column=0, padx=(10,5), pady=10)
+        self.theme_menu = ctk.CTkOptionMenu(theme_frame, values=["Light", "Dark", "System"],
+                                          command=self.change_theme)
+        self.theme_menu.set(self.current_theme.get())
+        self.theme_menu.grid(row=0, column=1, padx=(0,10), pady=10)
 
         # --- Recent Files Frame ---
         recent_frame = ctk.CTkFrame(self)
@@ -206,7 +203,7 @@ class PDFCompressorApp(ctk.CTk):
         self.file_list_textbox = ctk.CTkTextbox(file_frame, height=80, state="disabled")
         self.file_list_textbox.grid(row=0, column=0, columnspan=2, padx=10, pady=10, sticky="ew")
 
-        self.browse_button = ctk.CTkButton(file_frame, text="Pilih File PDF... (Multi-select: Ctrl+Click)", command=self.browse_files)
+        self.browse_button = ctk.CTkButton(file_frame, text="Pilih File PDF...", command=self.browse_files)
         self.browse_button.grid(row=1, column=0, padx=(10,5), pady=(0,10), sticky="ew")
 
         self.clear_button = ctk.CTkButton(file_frame, text="Bersihkan", command=self.clear_file_list, state="disabled")
@@ -239,7 +236,7 @@ class PDFCompressorApp(ctk.CTk):
 
         # --- Enhanced Status Frame ---
         status_frame = ctk.CTkFrame(self)
-        status_frame.grid(row=5, column=0, padx=10, pady=(5,10), sticky="ew")
+        status_frame.grid(row=5, column=0, padx=10, pady=10, sticky="ew")
         status_frame.grid_columnconfigure(0, weight=1)
 
         self.status_label = ctk.CTkLabel(status_frame, text="Siap untuk mengompres. Pilih file PDF untuk memulai.")
@@ -250,47 +247,25 @@ class PDFCompressorApp(ctk.CTk):
 
         self.progressbar = ctk.CTkProgressBar(status_frame)
         self.progressbar.set(0)
-        self.progressbar.grid(row=2, column=0, padx=10, pady=(0,10), sticky="ew")
+        self.progressbar.grid(row=2, column=0, padx=10, pady=(0,5), sticky="ew")
 
-        # Size comparison label - made more prominent
-        self.size_info_label = ctk.CTkLabel(status_frame, text="", 
-                                          font=ctk.CTkFont(size=12, weight="bold"))
-        self.size_info_label.grid(row=3, column=0, padx=10, pady=(0,15), sticky="w")
+        # Size comparison frame
+        self.size_frame = ctk.CTkFrame(status_frame)
+        self.size_frame.grid(row=3, column=0, padx=10, pady=(5,10), sticky="ew")
+        self.size_frame.grid_columnconfigure(1, weight=1)
+
+        self.size_info_label = ctk.CTkLabel(self.size_frame, text="")
+        self.size_info_label.grid(row=0, column=0, columnspan=2, padx=10, pady=5, sticky="w")
 
         # Initialize recent files menu
         self.update_recent_files_menu()
 
-    def toggle_theme(self):
-        """Toggle between Dark and Light theme"""
-        current_theme = self.current_theme.get()
-        if current_theme == "Light":
-            new_theme = "Dark"
-        else:
-            new_theme = "Light"
-        
-        self.current_theme.set(new_theme)
-        self.settings["theme"] = new_theme
-        self.save_settings()
-        ctk.set_appearance_mode(new_theme)
-        self.update_theme_icon()
-
-    def update_theme_icon(self):
-        """Update theme button icon based on current theme"""
-        current_theme = self.current_theme.get()
-        if current_theme == "Dark":
-            # Dark mode - show sun icon (to switch to light)
-            self.theme_button.configure(text="☀️", fg_color=("#3B8ED0", "#1F6AA5"))
-        else:
-            # Light mode - show moon icon (to switch to dark)
-            self.theme_button.configure(text="🌙", fg_color=("#3B8ED0", "#1F6AA5"))
-
     def change_theme(self, theme):
-        """Change application theme (kept for compatibility)"""
+        """Change application theme"""
         self.current_theme.set(theme)
         self.settings["theme"] = theme
         self.save_settings()
         ctk.set_appearance_mode(theme)
-        self.update_theme_icon()
 
     def load_recent_file(self, selection):
         """Load a recent file"""
@@ -352,28 +327,15 @@ class PDFCompressorApp(ctk.CTk):
             self.clear_button.configure(state="normal")
 
     def browse_files(self):
-        """Open file dialog to select PDF files (supports multiple selection)"""
+        """Open file dialog to select PDF files"""
         file_paths = filedialog.askopenfilenames(
-            title="Pilih File PDF (Bisa pilih banyak dengan Ctrl+Click atau Shift+Click)",
-            filetypes=[("PDF Files", "*.pdf")],
-            multiple=True  # Explicitly enable multiple selection
+            title="Pilih File PDF",
+            filetypes=[("PDF Files", "*.pdf")]
         )
         if file_paths:
             self.input_file_paths = list(file_paths)
             self.update_file_display()
             self.add_to_recent_files(file_paths)
-            
-            # Show helpful message for multi-file selection
-            if len(file_paths) > 1:
-                messagebox.showinfo("Multi-File Selected", 
-                                  f"Berhasil memilih {len(file_paths)} file PDF.\n"
-                                  f"Semua file akan dikompresi dalam satu proses batch.")
-        else:
-            messagebox.showinfo("Tips", 
-                              "Tips: Untuk memilih banyak file sekaligus:\n"
-                              "• Gunakan Ctrl+Click untuk pilih file individual\n"
-                              "• Gunakan Shift+Click untuk pilih range file\n"
-                              "• Atau gunakan Ctrl+A untuk pilih semua")
 
     def clear_file_list(self):
         """Clear selected files list"""
@@ -523,7 +485,7 @@ class PDFCompressorApp(ctk.CTk):
         self.output_button.configure(state=state)
         self.quality_menu.configure(state=state)
         self.compress_button.configure(state=state)
-        self.theme_button.configure(state=state)
+        self.theme_menu.configure(state=state)
         self.recent_files_menu.configure(state=state)
 
 
